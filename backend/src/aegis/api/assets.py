@@ -1,46 +1,60 @@
-"""Asset endpoints — query and control individual vehicles/drones."""
+"""Asset endpoints — returns LIVE data from the simulation engine.
+
+Phase 1: no more stubs. Every response comes from actual simulation state.
+"""
 
 from fastapi import APIRouter
 
 router = APIRouter()
 
 
+def _get_engine():
+
+    from aegis.state import get_engine
+    return get_engine()
+
+
 @router.get("/")
 async def list_assets():
-    """Return all assets across all active missions."""
-    # TODO: Phase 1 — pull from simulation engine state
+    """Return all assets with their current live state."""
+    engine = _get_engine()
+    vehicles = engine.get_all_vehicles()
     return {
-        "assets": [
-            {
-                "id": "drone-01",
-                "type": "quadrotor",
-                "callsign": "HAWK-1",
-                "status": "en_route",
-                "battery_pct": 82.0,
-                "position": {"x": 234.5, "y": 561.2},
-                "heading_deg": 45.0,
-                "speed_mps": 12.3,
-                "mission_id": "mission-001",
-            }
-        ]
+        "count": len(vehicles),
+        "assets": [v.to_dict() for v in vehicles],
     }
 
 
 @router.get("/{asset_id}")
 async def get_asset(asset_id: str):
-    """Return full telemetry snapshot for a single asset."""
-    # TODO: Phase 1 — pull from simulation engine
-    return {
-        "id": asset_id,
-        "type": "quadrotor",
-        "callsign": "HAWK-1",
-        "status": "en_route",
-        "battery_pct": 82.0,
-        "position": {"x": 234.5, "y": 561.2},
-        "heading_deg": 45.0,
-        "speed_mps": 12.3,
-        "mission_id": "mission-001",
-        "waypoints_completed": 2,
-        "waypoints_total": 6,
-        "last_updated": "2026-03-20T10:05:00Z",
-    }
+    """Return detailed live telemetry for a single asset."""
+    engine = _get_engine()
+    v = engine.get_vehicle(asset_id)
+    if not v:
+        # Try by callsign
+        v = engine.find_vehicle_by_callsign(asset_id)
+    if not v:
+        return {"error": f"Asset '{asset_id}' not found"}, 404
+
+    data = v.to_dict()
+    # Add extra detail for single-asset view
+    data["home"] = {"x": v.home_x, "y": v.home_y}
+    data["max_speed_mps"] = v.max_speed_mps
+    data["battery_drain_rate"] = v.battery_drain_rate
+    return data
+
+
+@router.post("/{asset_id}/rtb")
+async def command_asset_rtb(asset_id: str):
+    """Command a specific asset to return to base."""
+    engine = _get_engine()
+    result = engine.exec_rtb(asset_id)
+    return result
+
+
+@router.post("/{asset_id}/hold")
+async def command_asset_hold(asset_id: str):
+    """Command a specific asset to hold position."""
+    engine = _get_engine()
+    result = engine.exec_hold_position(asset_id)
+    return result

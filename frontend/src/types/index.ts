@@ -63,6 +63,10 @@ export interface MissionSummary {
 export interface TelemetryFrame {
   tick: number;
   timestamp: string;
+  paused: boolean;
+  elapsed_seconds: number;
+  mission_id: string | null;
+  mission_name: string;
   world: {
     width: number;
     height: number;

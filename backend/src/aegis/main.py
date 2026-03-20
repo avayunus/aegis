@@ -2,9 +2,10 @@
 
 This is the entrypoint for the backend service. It wires together:
 - REST API routes (missions, assets, commands, health)
-- WebSocket endpoints (telemetry stream, command stream)
+- WebSocket endpoints (telemetry stream)
 - Simulation engine lifecycle
 - Database initialization
+- Scenario loading from JSON files
 """
 
 from contextlib import asynccontextmanager
@@ -19,6 +20,10 @@ from aegis.simulation.engine import SimulationEngine
 # ── Simulation engine (singleton) ───────────────────────
 sim_engine = SimulationEngine()
 
+# Register in shared state so all modules access the same instance
+from aegis.state import set_engine
+set_engine(sim_engine)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,13 +37,16 @@ async def lifespan(app: FastAPI):
     from aegis.models import init_db
     await init_db()
 
-    # Load default demo scenario
-    from aegis.simulation.scenarios import load_search_and_rescue
-    load_search_and_rescue(sim_engine)
+    # Load default scenario from JSON
+    from aegis.simulation.scenarios import load_default_scenario
+    meta = load_default_scenario(sim_engine)
+    sim_engine.mission_id = meta["id"]
+    sim_engine.mission_name = meta["name"]
 
     # Start the simulation loop
     await sim_engine.start()
     print("[AEGIS] Simulation engine started")
+    print(f"[AEGIS] Mission: {meta['name']} ({meta['asset_count']} assets)")
 
     yield  # App is running
 

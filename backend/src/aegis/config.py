@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     openclaw_gateway_url: str = "ws://127.0.0.1:18789"
     openclaw_enabled: bool = False
 
+    # ── AI Agent (Claude API) ────────────────────────
+    anthropic_api_key: str = ""
+
     model_config = {"env_file": ".env", "env_prefix": "AEGIS_"}
 
 

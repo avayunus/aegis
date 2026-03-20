@@ -1,140 +1,117 @@
-"""Scenario definitions — predefined missions for demos and testing.
+"""Scenario loader — reads scenario configs from JSON files.
 
-Each scenario function sets up the world with vehicles and waypoints.
-Call one from the startup lifespan or from a demo API endpoint.
+Phase 1 upgrade: instead of hardcoded Python functions, scenarios are
+loaded from JSON files in the /scenarios directory. This makes it easy
+to create new demos, share them, and version-control them.
 """
+
+import json
+from pathlib import Path
 
 from aegis.simulation.engine import SimulationEngine
 from aegis.simulation.vehicle import Vehicle, VehicleType, Waypoint
 
+# Map JSON vehicle types to enum values
+_VEHICLE_TYPE_MAP = {
+    "quadrotor": VehicleType.QUADROTOR,
+    "fixed_wing": VehicleType.FIXED_WING,
+    "ground_rover": VehicleType.GROUND_ROVER,
+    "ground_vehicle": VehicleType.GROUND_ROVER,
+}
 
-def load_search_and_rescue(engine: SimulationEngine) -> None:
-    """Search-and-rescue scenario: 3 drones sweep a grid pattern.
+# Default scenario search path
+SCENARIOS_DIR = Path(__file__).resolve().parents[4] / "scenarios"
 
-    Scenario:
-        A distress signal was received from a 500x500m zone in the northeast
-        quadrant. Three drones are dispatched from base (0, 0) to sweep
-        the area in parallel lanes.
+
+def list_scenarios() -> list[dict]:
+    """Return metadata for all available scenario files."""
+    results = []
+    if not SCENARIOS_DIR.exists():
+        return results
+    for f in sorted(SCENARIOS_DIR.glob("*.json")):
+        try:
+            data = json.loads(f.read_text())
+            results.append({
+                "id": data.get("id", f.stem),
+                "name": data.get("name", f.stem),
+                "description": data.get("description", ""),
+                "mission_type": data.get("mission_type", "unknown"),
+                "asset_count": len(data.get("assets", [])),
+                "filename": f.name,
+            })
+        except (json.JSONDecodeError, KeyError):
+            continue
+    return results
+
+
+def load_scenario_from_file(engine: SimulationEngine, filename: str) -> dict:
+    """Load a scenario from a JSON file and populate the simulation engine.
+
+    Args:
+        engine: The simulation engine to populate.
+        filename: Name of the JSON file (e.g., 'search-and-rescue.json').
+
+    Returns:
+        The parsed scenario metadata dict.
+
+    Raises:
+        FileNotFoundError: If the scenario file doesn't exist.
+        ValueError: If the JSON is malformed.
     """
-    # Drone 1 — West lane
-    d1 = Vehicle(
-        id="drone-01",
-        callsign="HAWK-1",
-        vehicle_type=VehicleType.QUADROTOR,
-        x=50.0, y=50.0,
-        home_x=50.0, home_y=50.0,
-        max_speed_mps=12.0,
-        battery_drain_rate=0.3,
-    )
-    d1.assign_waypoints([
-        Waypoint(x=200.0, y=500.0, label="WP-A1"),
-        Waypoint(x=200.0, y=700.0, label="WP-A2"),
-        Waypoint(x=200.0, y=900.0, label="WP-A3"),
-        Waypoint(x=50.0, y=50.0, label="HOME"),
-    ])
+    filepath = SCENARIOS_DIR / filename
+    if not filepath.exists():
+        raise FileNotFoundError(f"Scenario file not found: {filepath}")
 
-    # Drone 2 — Center lane
-    d2 = Vehicle(
-        id="drone-02",
-        callsign="HAWK-2",
-        vehicle_type=VehicleType.QUADROTOR,
-        x=50.0, y=100.0,
-        home_x=50.0, home_y=100.0,
-        max_speed_mps=12.0,
-        battery_drain_rate=0.3,
-    )
-    d2.assign_waypoints([
-        Waypoint(x=500.0, y=500.0, label="WP-B1"),
-        Waypoint(x=500.0, y=700.0, label="WP-B2"),
-        Waypoint(x=500.0, y=900.0, label="WP-B3"),
-        Waypoint(x=50.0, y=100.0, label="HOME"),
-    ])
+    data = json.loads(filepath.read_text())
 
-    # Drone 3 — East lane
-    d3 = Vehicle(
-        id="drone-03",
-        callsign="HAWK-3",
-        vehicle_type=VehicleType.QUADROTOR,
-        x=100.0, y=50.0,
-        home_x=100.0, home_y=50.0,
-        max_speed_mps=12.0,
-        battery_drain_rate=0.3,
-    )
-    d3.assign_waypoints([
-        Waypoint(x=800.0, y=500.0, label="WP-C1"),
-        Waypoint(x=800.0, y=700.0, label="WP-C2"),
-        Waypoint(x=800.0, y=900.0, label="WP-C3"),
-        Waypoint(x=100.0, y=50.0, label="HOME"),
-    ])
+    # Update world size if specified
+    if "world" in data:
+        engine.world.width = data["world"].get("width", engine.world.width)
+        engine.world.height = data["world"].get("height", engine.world.height)
 
-    engine.add_vehicle(d1)
-    engine.add_vehicle(d2)
-    engine.add_vehicle(d3)
+    # Load each asset
+    for asset_def in data.get("assets", []):
+        vtype = _VEHICLE_TYPE_MAP.get(asset_def["vehicle_type"], VehicleType.QUADROTOR)
 
-    print("[Scenario] Loaded: Search & Rescue — 3 drones, grid sweep pattern")
+        vehicle = Vehicle(
+            id=asset_def["id"],
+            callsign=asset_def["callsign"],
+            vehicle_type=vtype,
+            x=float(asset_def.get("start_x", 0)),
+            y=float(asset_def.get("start_y", 0)),
+            home_x=float(asset_def.get("home_x", 0)),
+            home_y=float(asset_def.get("home_y", 0)),
+            max_speed_mps=float(asset_def.get("max_speed_mps", 10.0)),
+            battery_pct=float(asset_def.get("battery_pct", 100.0)),
+            battery_drain_rate=float(asset_def.get("battery_drain_rate", 0.3)),
+        )
+
+        waypoints = [
+            Waypoint(
+                x=float(wp["x"]),
+                y=float(wp["y"]),
+                label=wp.get("label", ""),
+            )
+            for wp in asset_def.get("waypoints", [])
+        ]
+        if waypoints:
+            vehicle.assign_waypoints(waypoints)
+
+        engine.add_vehicle(vehicle)
+
+    asset_count = len(data.get("assets", []))
+    name = data.get("name", filename)
+    print(f"[Scenario] Loaded: {name} — {asset_count} assets")
+
+    return {
+        "id": data.get("id", filename.replace(".json", "")),
+        "name": name,
+        "description": data.get("description", ""),
+        "mission_type": data.get("mission_type", "unknown"),
+        "asset_count": asset_count,
+    }
 
 
-def load_perimeter_patrol(engine: SimulationEngine) -> None:
-    """Perimeter patrol scenario: 2 drones + 1 ground rover patrol a boundary.
-
-    Scenario:
-        A 800x800m facility perimeter needs continuous monitoring.
-        Two drones patrol the air boundary while a ground rover
-        follows the fence line.
-    """
-    # Air patrol — clockwise
-    d1 = Vehicle(
-        id="drone-04",
-        callsign="SENTRY-1",
-        vehicle_type=VehicleType.QUADROTOR,
-        x=100.0, y=100.0,
-        home_x=100.0, home_y=100.0,
-        max_speed_mps=10.0,
-        battery_drain_rate=0.25,
-    )
-    d1.assign_waypoints([
-        Waypoint(x=900.0, y=100.0, label="NE-Corner"),
-        Waypoint(x=900.0, y=900.0, label="SE-Corner"),
-        Waypoint(x=100.0, y=900.0, label="SW-Corner"),
-        Waypoint(x=100.0, y=100.0, label="NW-Corner"),
-    ])
-
-    # Air patrol — counter-clockwise
-    d2 = Vehicle(
-        id="drone-05",
-        callsign="SENTRY-2",
-        vehicle_type=VehicleType.QUADROTOR,
-        x=100.0, y=900.0,
-        home_x=100.0, home_y=100.0,
-        max_speed_mps=10.0,
-        battery_drain_rate=0.25,
-    )
-    d2.assign_waypoints([
-        Waypoint(x=100.0, y=100.0, label="NW-Corner"),
-        Waypoint(x=900.0, y=100.0, label="NE-Corner"),
-        Waypoint(x=900.0, y=900.0, label="SE-Corner"),
-        Waypoint(x=100.0, y=900.0, label="SW-Corner"),
-    ])
-
-    # Ground rover — fence line
-    rover = Vehicle(
-        id="rover-01",
-        callsign="GROUND-1",
-        vehicle_type=VehicleType.GROUND_ROVER,
-        x=100.0, y=100.0,
-        home_x=100.0, home_y=100.0,
-        max_speed_mps=3.0,
-        battery_drain_rate=0.15,
-    )
-    rover.assign_waypoints([
-        Waypoint(x=500.0, y=100.0, label="N-Mid"),
-        Waypoint(x=900.0, y=100.0, label="NE-Corner"),
-        Waypoint(x=900.0, y=500.0, label="E-Mid"),
-        Waypoint(x=900.0, y=900.0, label="SE-Corner"),
-    ])
-
-    engine.add_vehicle(d1)
-    engine.add_vehicle(d2)
-    engine.add_vehicle(rover)
-
-    print("[Scenario] Loaded: Perimeter Patrol — 2 drones + 1 rover")
+def load_default_scenario(engine: SimulationEngine) -> dict:
+    """Load the default demo scenario (search-and-rescue)."""
+    return load_scenario_from_file(engine, "search-and-rescue.json")

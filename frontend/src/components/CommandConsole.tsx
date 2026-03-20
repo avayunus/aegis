@@ -1,19 +1,22 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, ChevronRight } from "lucide-react";
-import { submitCommand } from "../services/api";
+import { Send, ChevronRight, ShieldAlert, Check, X } from "lucide-react";
+import { submitCommand, approveCommand, rejectCommand } from "../services/api";
+import type { CommandResponse } from "../services/api";
 
 interface LogEntry {
   id: number;
-  type: "operator" | "system" | "error";
+  type: "operator" | "system" | "error" | "approval" | "blocked";
   text: string;
   timestamp: string;
+  commandId?: string;
+  riskLevel?: string;
 }
 
 /**
  * Operator command console — the natural-language interface.
  *
- * Operators type commands here. The AI (via OpenClaw in Phase 3) interprets
- * and executes them. For now, commands are echoed and sent to the backend stub.
+ * Phase 1: Commands are interpreted by pattern matching and executed
+ * against the live simulation. High-risk commands show approval buttons.
  */
 export function CommandConsole() {
   const [input, setInput] = useState("");
@@ -21,7 +24,7 @@ export function CommandConsole() {
     {
       id: 0,
       type: "system",
-      text: "AEGIS operator console initialized. Type a command or query.",
+      text: "AEGIS operator console ready. Try: 'status of HAWK-1', 'return HAWK-2 to base', 'battery report', 'mission summary'",
       timestamp: new Date().toLocaleTimeString(),
     },
   ]);
@@ -30,12 +33,16 @@ export function CommandConsole() {
   const inputRef = useRef<HTMLInputElement>(null);
   const idCounter = useRef(1);
 
-  // Auto-scroll to bottom when new log entries appear
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [log]);
 
-  const addEntry = (type: LogEntry["type"], text: string) => {
+  const addEntry = (
+    type: LogEntry["type"],
+    text: string,
+    commandId?: string,
+    riskLevel?: string
+  ) => {
     setLog((prev) => [
       ...prev,
       {
@@ -43,6 +50,8 @@ export function CommandConsole() {
         type,
         text,
         timestamp: new Date().toLocaleTimeString(),
+        commandId,
+        riskLevel,
       },
     ]);
   };
@@ -56,17 +65,70 @@ export function CommandConsole() {
     setIsProcessing(true);
 
     try {
-      const result = await submitCommand(trimmed);
-      const summary =
-        (result as Record<string, string>).result_summary ??
-        (result as Record<string, string>).status ??
-        "Command received.";
-      addEntry("system", String(summary));
+      const result: CommandResponse = await submitCommand(trimmed);
+
+      if (result.status === "blocked") {
+        addEntry(
+          "blocked",
+          `BLOCKED: ${result.interpreted_intent}. Command denied by policy engine.`,
+          result.command_id,
+          result.risk_level
+        );
+      } else if (result.requires_approval) {
+        addEntry(
+          "approval",
+          result.ai_response
+            ? `${result.ai_response}`
+            : `⚠ HIGH RISK: "${result.interpreted_intent}" — requires operator approval`,
+          result.command_id,
+          result.risk_level
+        );
+      } else {
+        // Build the display text
+        const aiText = result.ai_response || "";
+        const summary = result.result_summary || result.interpreted_intent;
+        const displayText = aiText || summary;
+        const prefix = result.risk_level === "medium" ? "[CONFIRM] " : "";
+        addEntry("system", prefix + displayText, result.command_id, result.risk_level);
+      }
     } catch (err) {
       addEntry("error", `Failed to send command: ${err}`);
     } finally {
       setIsProcessing(false);
       inputRef.current?.focus();
+    }
+  };
+
+  const handleApprove = async (commandId: string) => {
+    try {
+      const result = await approveCommand(commandId);
+      const summary = (result as Record<string, string>).result_summary ?? "Approved and executed";
+      addEntry("system", `✓ APPROVED: ${summary}`, commandId);
+      // Remove the approval entry
+      setLog((prev) =>
+        prev.map((e) =>
+          e.commandId === commandId && e.type === "approval"
+            ? { ...e, type: "system" as const, text: `✓ APPROVED: ${summary}` }
+            : e
+        )
+      );
+    } catch (err) {
+      addEntry("error", `Approval failed: ${err}`);
+    }
+  };
+
+  const handleReject = async (commandId: string) => {
+    try {
+      await rejectCommand(commandId);
+      setLog((prev) =>
+        prev.map((e) =>
+          e.commandId === commandId && e.type === "approval"
+            ? { ...e, type: "system" as const, text: "✗ REJECTED by operator" }
+            : e
+        )
+      );
+    } catch (err) {
+      addEntry("error", `Rejection failed: ${err}`);
     }
   };
 
@@ -88,23 +150,52 @@ export function CommandConsole() {
             <span className="text-aegis-text-muted flex-shrink-0">
               {entry.timestamp}
             </span>
+
             {entry.type === "operator" && (
               <>
                 <ChevronRight className="w-3 h-3 text-aegis-accent mt-0.5 flex-shrink-0" />
                 <span className="text-aegis-accent">{entry.text}</span>
               </>
             )}
+
             {entry.type === "system" && (
               <>
-                <span className="text-aegis-text-muted flex-shrink-0">SYS</span>
+                <span className="text-aegis-success flex-shrink-0">SYS</span>
                 <span className="text-aegis-text-dim">{entry.text}</span>
               </>
             )}
+
             {entry.type === "error" && (
               <>
                 <span className="text-aegis-danger flex-shrink-0">ERR</span>
                 <span className="text-aegis-danger">{entry.text}</span>
               </>
+            )}
+
+            {entry.type === "blocked" && (
+              <>
+                <ShieldAlert className="w-3 h-3 text-aegis-danger mt-0.5 flex-shrink-0" />
+                <span className="text-aegis-danger">{entry.text}</span>
+              </>
+            )}
+
+            {entry.type === "approval" && (
+              <div className="flex items-center gap-2 flex-1">
+                <ShieldAlert className="w-3 h-3 text-aegis-warning mt-0.5 flex-shrink-0" />
+                <span className="text-aegis-warning flex-1">{entry.text}</span>
+                <button
+                  onClick={() => entry.commandId && handleApprove(entry.commandId)}
+                  className="px-2 py-0.5 bg-aegis-success/20 text-aegis-success rounded text-[10px] font-semibold hover:bg-aegis-success/30 flex items-center gap-1"
+                >
+                  <Check className="w-3 h-3" /> APPROVE
+                </button>
+                <button
+                  onClick={() => entry.commandId && handleReject(entry.commandId)}
+                  className="px-2 py-0.5 bg-aegis-danger/20 text-aegis-danger rounded text-[10px] font-semibold hover:bg-aegis-danger/30 flex items-center gap-1"
+                >
+                  <X className="w-3 h-3" /> REJECT
+                </button>
+              </div>
             )}
           </div>
         ))}
