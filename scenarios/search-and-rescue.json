@@ -1,0 +1,87 @@
+{
+  "id": "search-and-rescue",
+  "name": "Alpha Sweep — Urban Search and Rescue",
+  "description": "Three drones and one ground rover sweep a 1km x 1km area searching for survivors after a structural collapse. Demonstrates multi-asset coordination, battery management, and anomaly detection.",
+  "mission_type": "search_and_rescue",
+  "world": {
+    "width": 1000,
+    "height": 1000
+  },
+  "assets": [
+    {
+      "id": "drone-01",
+      "callsign": "HAWK-1",
+      "vehicle_type": "quadrotor",
+      "start_x": 50,
+      "start_y": 50,
+      "home_x": 50,
+      "home_y": 50,
+      "max_speed_mps": 15.0,
+      "battery_pct": 100.0,
+      "battery_drain_rate": 0.4,
+      "waypoints": [
+        { "x": 200, "y": 200, "label": "GRID-A1" },
+        { "x": 400, "y": 200, "label": "GRID-A2" },
+        { "x": 400, "y": 400, "label": "GRID-A3" },
+        { "x": 200, "y": 400, "label": "GRID-A4" },
+        { "x": 50,  "y": 50,  "label": "HOME" }
+      ]
+    },
+    {
+      "id": "drone-02",
+      "callsign": "HAWK-2",
+      "vehicle_type": "quadrotor",
+      "start_x": 50,
+      "start_y": 100,
+      "home_x": 50,
+      "home_y": 100,
+      "max_speed_mps": 15.0,
+      "battery_pct": 100.0,
+      "battery_drain_rate": 0.4,
+      "waypoints": [
+        { "x": 600, "y": 200, "label": "GRID-B1" },
+        { "x": 800, "y": 200, "label": "GRID-B2" },
+        { "x": 800, "y": 400, "label": "GRID-B3" },
+        { "x": 600, "y": 400, "label": "GRID-B4" },
+        { "x": 50,  "y": 100, "label": "HOME" }
+      ]
+    },
+    {
+      "id": "drone-03",
+      "callsign": "HAWK-3",
+      "vehicle_type": "quadrotor",
+      "start_x": 50,
+      "start_y": 150,
+      "home_x": 50,
+      "home_y": 150,
+      "max_speed_mps": 15.0,
+      "battery_pct": 70.0,
+      "battery_drain_rate": 0.6,
+      "waypoints": [
+        { "x": 300, "y": 600, "label": "GRID-C1" },
+        { "x": 500, "y": 600, "label": "GRID-C2" },
+        { "x": 700, "y": 600, "label": "GRID-C3" },
+        { "x": 700, "y": 800, "label": "GRID-C4" },
+        { "x": 50,  "y": 150, "label": "HOME" }
+      ]
+    },
+    {
+      "id": "rover-01",
+      "callsign": "BADGER-1",
+      "vehicle_type": "ground_rover",
+      "start_x": 100,
+      "start_y": 50,
+      "home_x": 100,
+      "home_y": 50,
+      "max_speed_mps": 4.0,
+      "battery_pct": 100.0,
+      "battery_drain_rate": 0.15,
+      "waypoints": [
+        { "x": 300, "y": 300, "label": "RALLY-1" },
+        { "x": 500, "y": 500, "label": "COLLAPSE-SITE" },
+        { "x": 700, "y": 700, "label": "RALLY-2" },
+        { "x": 100, "y": 50,  "label": "HOME" }
+      ]
+    }
+  ]
+}

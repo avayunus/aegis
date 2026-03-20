@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base overrides ────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3548 #111827;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111827;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a3548;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+
+/* ── Panel component ──────────────────────────── */
+@layer components {
+  .panel {
+    @apply bg-aegis-panel border border-aegis-border rounded-lg;
+  }
+
+  .panel-header {
+    @apply px-3 py-2 border-b border-aegis-border text-xs font-semibold uppercase tracking-wider text-aegis-text-dim;
+  }
+
+  .panel-body {
+    @apply p-3;
+  }
+
+  /* Status indicator dot */
+  .status-dot {
+    @apply inline-block w-2 h-2 rounded-full;
+  }
+
+  .status-dot-active {
+    @apply bg-aegis-success animate-pulse-slow;
+  }
+
+  .status-dot-warning {
+    @apply bg-aegis-warning;
+  }
+
+  .status-dot-danger {
+    @apply bg-aegis-danger animate-pulse;
+  }
+
+  .status-dot-offline {
+    @apply bg-aegis-text-muted;
+  }
+}

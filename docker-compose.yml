@@ -1,0 +1,29 @@
+# AEGIS — Docker Compose (for later phases)
+# Run: docker compose up --build
+
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - AEGIS_DATABASE_URL=sqlite+aiosqlite:///./aegis.db
+      - AEGIS_SIM_TICK_RATE_HZ=2.0
+    volumes:
+      - backend-data:/app/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  backend-data:

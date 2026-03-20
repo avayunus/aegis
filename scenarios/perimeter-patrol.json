@@ -1,0 +1,66 @@
+{
+  "id": "perimeter-patrol",
+  "name": "Bravo Watch — Perimeter Patrol",
+  "description": "Two drones and one ground rover patrol a facility perimeter. Demonstrates continuous monitoring, mixed-asset coordination, and comms-limited operations.",
+  "mission_type": "patrol",
+  "world": {
+    "width": 1000,
+    "height": 1000
+  },
+  "assets": [
+    {
+      "id": "drone-04",
+      "callsign": "SENTRY-1",
+      "vehicle_type": "quadrotor",
+      "start_x": 100,
+      "start_y": 100,
+      "home_x": 100,
+      "home_y": 100,
+      "max_speed_mps": 10.0,
+      "battery_pct": 100.0,
+      "battery_drain_rate": 0.25,
+      "waypoints": [
+        { "x": 900, "y": 100, "label": "NE-CORNER" },
+        { "x": 900, "y": 900, "label": "SE-CORNER" },
+        { "x": 100, "y": 900, "label": "SW-CORNER" },
+        { "x": 100, "y": 100, "label": "NW-CORNER" }
+      ]
+    },
+    {
+      "id": "drone-05",
+      "callsign": "SENTRY-2",
+      "vehicle_type": "quadrotor",
+      "start_x": 100,
+      "start_y": 900,
+      "home_x": 100,
+      "home_y": 100,
+      "max_speed_mps": 10.0,
+      "battery_pct": 100.0,
+      "battery_drain_rate": 0.25,
+      "waypoints": [
+        { "x": 100, "y": 100, "label": "NW-CORNER" },
+        { "x": 900, "y": 100, "label": "NE-CORNER" },
+        { "x": 900, "y": 900, "label": "SE-CORNER" },
+        { "x": 100, "y": 900, "label": "SW-CORNER" }
+      ]
+    },
+    {
+      "id": "rover-02",
+      "callsign": "GROUND-1",
+      "vehicle_type": "ground_rover",
+      "start_x": 100,
+      "start_y": 100,
+      "home_x": 100,
+      "home_y": 100,
+      "max_speed_mps": 3.0,
+      "battery_pct": 100.0,
+      "battery_drain_rate": 0.15,
+      "waypoints": [
+        { "x": 500, "y": 100, "label": "N-MID" },
+        { "x": 900, "y": 100, "label": "NE-CORNER" },
+        { "x": 900, "y": 500, "label": "E-MID" },
+        { "x": 900, "y": 900, "label": "SE-CORNER" }
+      ]
+    }
+  ]
+}
